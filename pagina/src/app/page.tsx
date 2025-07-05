@@ -1,103 +1,270 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import React, { useState } from "react";
+import { Button } from "@/components/ui/Button";
+import { Card, CardContent } from "@/components/ui/Card";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+
+interface Organismo {
+  a: number;
+  b: number;
+  c: number;
+  bin: string;
+  adaptabilidad: number;
+}
+
+const Principal: React.FC = () => {
+  const [form, setForm] = useState({
+    a: "",
+    b: "",
+    c: "",
+    rangoa: "",
+    rangob: "",
+    rangoc: "",
+  });
+  const [errorPromedio, setErrorPromedio] = useState<
+    { generacion: number; error: number }[]
+  >([]);
+  const [evolucion, setEvolucion] = useState<
+    { generacion: number; error: number }[]
+  >([]);
+  const [resultado, setResultado] = useState<Organismo[]>([]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async () => {
+    try {
+      await fetch("http://localhost:8000/add-values", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          a: form.a,
+          b: form.b,
+          c: form.c,
+          rangoa: form.rangoa,
+          rangob: form.rangob,
+          rangoc: form.rangoc,
+        }),
+      });
+
+      await fetch("http://localhost:8000/generate-organisms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const res = await fetch("http://localhost:8000/get-best");
+      const datos = await res.json();
+      setResultado(datos);
+
+      const resEvo = await fetch("http://localhost:8000/get-evolution");
+      const evoDatos = await resEvo.json();
+
+      const puntos = Array.from({ length: 20 }, (_, i) => -10 + i * (20 / 19)); // 20 puntos entre [-10, 10]
+      const fa = parseFloat(form.a);
+      const fb = parseFloat(form.b);
+      const fc = parseFloat(form.c);
+
+      const fy = puntos.map((x) => fa * x ** 2 + fb * x + fc);
+
+      const evolucionData = evoDatos.map((org: Organismo, i: number) => {
+        const error =
+          puntos.reduce((sum, x, j) => {
+            const yOrg = org.a * x ** 2 + org.b * x + org.c;
+            return sum + Math.abs(yOrg - fy[j]);
+          }, 0) / puntos.length;
+
+        return {
+          generacion: i,
+          error: parseFloat(error.toFixed(4)),
+        };
+      });
+
+      setEvolucion(evolucionData);
+
+      const resProm = await fetch(
+        "http://localhost:8000/promedio-error"
+      );
+      const promedioDatos = await resProm.json();
+      setErrorPromedio(promedioDatos);
+    } catch (err) {
+      console.error("Error al enviar datos", err);
+    }
+  };
+
+  const top10 = resultado
+    .sort((a, b) => b.adaptabilidad - a.adaptabilidad)
+    .slice(0, 10);
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="max-w-4xl mx-auto mt-10 p-4">
+      <Card>
+        <CardContent className="grid grid-cols-3 gap-4">
+          <input
+            type="text"
+            name="a"
+            placeholder="a"
+            value={form.a}
+            onChange={handleChange}
+            className="border p-2 rounded"
+          />
+          <input
+            type="text"
+            name="b"
+            placeholder="b"
+            value={form.b}
+            onChange={handleChange}
+            className="border p-2 rounded"
+          />
+          <input
+            type="text"
+            name="c"
+            placeholder="c"
+            value={form.c}
+            onChange={handleChange}
+            className="border p-2 rounded"
+          />
+          <input
+            type="text"
+            name="rangoa"
+            placeholder="[-10,10]"
+            value={form.rangoa}
+            onChange={handleChange}
+            className="border p-2 rounded"
+          />
+          <input
+            type="text"
+            name="rangob"
+            placeholder="[-10,10]"
+            value={form.rangob}
+            onChange={handleChange}
+            className="border p-2 rounded"
+          />
+          <input
+            type="text"
+            name="rangoc"
+            placeholder="[-10,10]"
+            value={form.rangoc}
+            onChange={handleChange}
+            className="border p-2 rounded"
+          />
+        </CardContent>
+      </Card>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      <div className="mt-4 text-center">
+        <Button
+          onClick={handleSubmit}
+          className="bg-blue-600 hover:bg-blue-700"
+        >
+          Calcular y Mostrar Organismos
+        </Button>
+      </div>
+
+      {top10.length > 0 && (
+        <div className="mt-10">
+          <h2 className="text-xl font-bold mb-4">
+            Mejores Organismos (≥85% adaptabilidad)
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {top10.map((org, index) => (
+              <Card key={index}>
+                <CardContent>
+                  <p>
+                    <strong>a:</strong> {org.a}
+                  </p>
+                  <p>
+                    <strong>b:</strong> {org.b}
+                  </p>
+                  <p>
+                    <strong>c:</strong> {org.c}
+                  </p>
+                  <p>
+                    <strong>Binario:</strong> {org.bin}
+                  </p>
+                  <p>
+                    <strong>Adaptabilidad:</strong> {org.adaptabilidad}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      )}
+
+      {evolucion.length > 0 && (
+        <div className="mt-10">
+          <h2 className="text-xl font-bold mb-4">
+            Evolución del Error del Mejor Organismo
+          </h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={evolucion}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis
+                dataKey="generacion"
+                label={{
+                  value: "Generación",
+                  position: "insideBottom",
+                  offset: -5,
+                }}
+              />
+              <YAxis
+                label={{ value: "Error", angle: -90, position: "insideLeft" }}
+              />
+              <Tooltip />
+              <Line
+                type="monotone"
+                dataKey="error"
+                stroke="#8884d8"
+                strokeWidth={2}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {errorPromedio.length > 0 && (
+        <div className="mt-10">
+          <h2 className="text-xl font-bold mb-4">
+            Evolución del Error Promedio por Generación
+          </h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={errorPromedio}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis
+                dataKey="generacion"
+                label={{
+                  value: "Generación",
+                  position: "insideBottom",
+                  offset: -5,
+                }}
+              />
+              <YAxis
+                label={{
+                  value: "Error Promedio",
+                  angle: -90,
+                  position: "insideLeft",
+                }}
+              />
+              <Tooltip />
+              <Line
+                type="monotone"
+                dataKey="error"
+                stroke="#82ca9d"
+                strokeWidth={2}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </div>
   );
-}
+};
+
+export default Principal;
