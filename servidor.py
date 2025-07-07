@@ -21,12 +21,13 @@ pila = []
 error_por_generacion = []
 
 # Datos globales
-funcion_original = {'a': None, 'b': None, 'c': None}
+funcion_original = {'a': 10, 'b': 5, 'c': -3}
 rangos = {'a': None, 'b': None, 'c': None}
 mapas = {'a': None, 'b': None, 'c': None}
 poblacion = []
 puntos_x = []
 puntos_y = []
+criterio_paro = {"tipo": None}
 
 # --------------------------
 # Utilidades del algoritmo genético
@@ -143,8 +144,10 @@ def generar_poblacion():
     
 
 def evolucionar(generaciones=50, umbral=0.01):
-    global poblacion, mejores_por_generacion, pila
-    mejores_por_generacion = []
+    global poblacion, mejores_por_generacion, pila, error_por_generacion
+    mejores_por_generacion.clear()
+    error_por_generacion.clear()
+    erro_anterior = None
     pila = []
 
     for gen in range(generaciones):
@@ -168,8 +171,16 @@ def evolucionar(generaciones=50, umbral=0.01):
                         break
 
         #Si se cumple el criterio marcado por el umbral se detiene
-        if pila and max(e.adaptabilidad for e in pila) >= (1 - umbral):
-            break
+        if criterio_paro["tipo"] == "error_absoluto":
+            if pila and max(e.adaptabilidad for e in pila) >= (1 - umbral):
+                break
+
+        elif criterio_paro["tipo"] == "mejora_progresiva":
+            if erro_anterior is not None:
+                mejora = (erro_anterior - error_por_generacion[-1]) / erro_anterior if erro_anterior > 0 else 0
+                if mejora < 0.01:  # menos de 1% de mejora
+                    break
+            erro_anterior = error_por_generacion[-1]
 
         #Obtenemos al resto de la poblacion
         resto_pob = [p for p in poblacion if p not in pila]
@@ -194,22 +205,14 @@ def evolucionar(generaciones=50, umbral=0.01):
 
 @app.post('/add-values')
 def agregar(params: Parametros):
-    #print("Datos recibidos:", params)
-    a, b, c = ast.literal_eval(params.a), ast.literal_eval(params.b), ast.literal_eval(params.c)
-    rangoa, rangob, rangoc = ast.literal_eval(params.rangoa), ast.literal_eval(params.rangob), ast.literal_eval(params.rangoc)
+    rangos['a'], rangos['b'], rangos['c'] = ast.literal_eval(params.rangoa), ast.literal_eval(params.rangob), ast.literal_eval(params.rangoc)
 
-    funcion_original['a'] = a
-    funcion_original['b'] = b
-    funcion_original['c'] = c
-    rangos['a'] = rangoa
-    rangos['b'] = rangob
-    rangos['c'] = rangoc
-
-    mapas['a'], _ = mapear(rangoa)
-    mapas['b'], _ = mapear(rangob)
-    mapas['c'], _ = mapear(rangoc)
+    mapas['a'], _ = mapear(rangos['a'])
+    mapas['b'], _ = mapear(rangos['b'])
+    mapas['c'], _ = mapear(rangos['c'])
 
     generar_puntos_funcion_original()
+    criterio_paro["tipo"] = params.criterio
     return {'message': 'Función original y rangos definidos'}
 
 @app.post('/generate-organisms')
@@ -237,3 +240,7 @@ def get_promedio():
         {"generacion": i, "error": err}
         for i, err in enumerate(error_por_generacion)
     ]
+    
+@app.get('/get-original')
+def get_valores_originales():
+    return funcion_original

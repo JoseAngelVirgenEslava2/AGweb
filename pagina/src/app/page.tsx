@@ -23,12 +23,10 @@ interface Organismo {
 
 const Principal: React.FC = () => {
   const [form, setForm] = useState({
-    a: "",
-    b: "",
-    c: "",
     rangoa: "",
     rangob: "",
     rangoc: "",
+    criterio: ""
   });
   const [errorPromedio, setErrorPromedio] = useState<
     { generacion: number; error: number }[]
@@ -38,7 +36,16 @@ const Principal: React.FC = () => {
   >([]);
   const [resultado, setResultado] = useState<Organismo[]>([]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const criterios = [
+    { value: "error_absoluto", label: "Error absoluto (adaptabilidad ≥ 99%)" },
+    { value: "mejora_progresiva", label: "Mejora progresiva (mejora < 1%)" },
+  ];
+
+  //const [original, setOriginal] = useState<{ a: number; b: number; c: number } | null>(null);
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
@@ -48,12 +55,10 @@ const Principal: React.FC = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          a: form.a,
-          b: form.b,
-          c: form.c,
           rangoa: form.rangoa,
           rangob: form.rangob,
           rangoc: form.rangoc,
+          criterio: form.criterio,
         }),
       });
 
@@ -68,10 +73,14 @@ const Principal: React.FC = () => {
       const resEvo = await fetch("http://localhost:8000/get-evolution");
       const evoDatos = await resEvo.json();
 
+      const firstValues = await fetch('http://localhost:8000/get-original');
+      const valores = await firstValues.json();
+      //setOriginal(valores);
+
       const puntos = Array.from({ length: 20 }, (_, i) => -10 + i * (20 / 19)); // 20 puntos entre [-10, 10]
-      const fa = parseFloat(form.a);
-      const fb = parseFloat(form.b);
-      const fc = parseFloat(form.c);
+      const fa = valores.a;
+      const fb = valores.b;
+      const fc = valores.c;
 
       const fy = puntos.map((x) => fa * x ** 2 + fb * x + fc);
 
@@ -90,9 +99,7 @@ const Principal: React.FC = () => {
 
       setEvolucion(evolucionData);
 
-      const resProm = await fetch(
-        "http://localhost:8000/promedio-error"
-      );
+      const resProm = await fetch("http://localhost:8000/promedio-error");
       const promedioDatos = await resProm.json();
       setErrorPromedio(promedioDatos);
     } catch (err) {
@@ -103,34 +110,11 @@ const Principal: React.FC = () => {
   const top10 = resultado
     .sort((a, b) => b.adaptabilidad - a.adaptabilidad)
     .slice(0, 10);
+  
   return (
     <div className="max-w-4xl mx-auto mt-10 p-4">
       <Card>
         <CardContent className="grid grid-cols-3 gap-4">
-          <input
-            type="text"
-            name="a"
-            placeholder="a"
-            value={form.a}
-            onChange={handleChange}
-            className="border p-2 rounded"
-          />
-          <input
-            type="text"
-            name="b"
-            placeholder="b"
-            value={form.b}
-            onChange={handleChange}
-            className="border p-2 rounded"
-          />
-          <input
-            type="text"
-            name="c"
-            placeholder="c"
-            value={form.c}
-            onChange={handleChange}
-            className="border p-2 rounded"
-          />
           <input
             type="text"
             name="rangoa"
@@ -155,6 +139,18 @@ const Principal: React.FC = () => {
             onChange={handleChange}
             className="border p-2 rounded"
           />
+          <select
+            name="criterio"
+            value={form.criterio}
+            onChange={handleChange}
+            className="col-span-3 border p-2 rounded"
+          >
+            {criterios.map((op) => (
+              <option key={op.value} value={op.value}>
+                {op.label}
+              </option>
+            ))}
+          </select>
         </CardContent>
       </Card>
 
