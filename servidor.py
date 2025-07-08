@@ -79,8 +79,6 @@ def evaluar_poblacion():
     for elem, err in errores:
         adaptabilidad = max(0.0, 1.0 - (err / max_error)) if max_error != 0 else 1.0
         elem.adaptabilidad = round(adaptabilidad, 4)
-    promedio_error = sum(err for _, err in errores) / len(errores) if errores else 0
-    error_por_generacion.append(round(promedio_error, 6))
     return sorted(errores, key=lambda x: x[0].adaptabilidad, reverse=True)
 
 def seleccion_ruleta(individuos=None):
@@ -153,47 +151,49 @@ def evolucionar(generaciones=50, umbral=0.01):
     for gen in range(generaciones):
         evaluar_poblacion()
         poblacion.sort(key=lambda e: e.adaptabilidad, reverse=True)
+
+        # Calcular error promedio antes de registrar
+        errores = [calcular_error(e.a, e.b, e.c) for e in poblacion]
+        promedio_error = sum(errores) / len(errores)
+
+        # Verificación de criterio de paro
+        if criterio_paro["tipo"] == "error_absoluto":
+            if max(e.adaptabilidad for e in poblacion) >= (1 - umbral):
+                break
+
+        elif criterio_paro["tipo"] == "mejora_progresiva":
+            if erro_anterior is not None:
+                mejora = (erro_anterior - promedio_error) / erro_anterior if erro_anterior > 0 else 0
+                if mejora < 0.01:
+                    break
+            erro_anterior = promedio_error
+
+        # Guardar el mejor organismo de la generación
         mejor_actual = max(poblacion, key=lambda e: e.adaptabilidad)
         mejores_por_generacion.append(mejor_actual)
-        #Se guarda al mejor organismo de esa generacion en el arreglo
-        #mejores_por_generacion.append(poblacion[0])
+        error_por_generacion.append(promedio_error)
 
-        # Se inicializa la pila con los 2 primeros organismos segun el criterio
+        # Se inicializa la pila con los 2 primeros organismos según el criterio
         if gen == 0:
             pila = poblacion[:2]
         else:
             for nuevo in poblacion:
-                # Si este nuevo organismo esta mas adaptado que el i-esimo
-                # organismo de la pila, se reemplaza
                 for i in range(len(pila)):
                     if nuevo.adaptabilidad > pila[i].adaptabilidad:
                         pila[i] = nuevo
                         break
 
-        #Si se cumple el criterio marcado por el umbral se detiene
-        if criterio_paro["tipo"] == "error_absoluto":
-            if pila and max(e.adaptabilidad for e in pila) >= (1 - umbral):
-                break
-
-        elif criterio_paro["tipo"] == "mejora_progresiva":
-            if erro_anterior is not None:
-                mejora = (erro_anterior - error_por_generacion[-1]) / erro_anterior if erro_anterior > 0 else 0
-                if mejora < 0.01:  # menos de 1% de mejora
-                    break
-            erro_anterior = error_por_generacion[-1]
-
-        #Obtenemos al resto de la poblacion
+        # Obtener el resto de la población y aplicar ruleta
         resto_pob = [p for p in poblacion if p not in pila]
         seleccionados = seleccion_ruleta(resto_pob)
 
         nueva_pob = pila.copy()
 
         for i in range(0, len(seleccionados) - 1, 2):
-            hijo = cruzar(seleccionados[i], seleccionados[i+1])
+            hijo = cruzar(seleccionados[i], seleccionados[i + 1])
             hijo = mutar(hijo)
             nueva_pob.append(hijo)
 
-        # Si falta para completar la poblacion
         while len(nueva_pob) < len(poblacion):
             nueva_pob.append(random.choice(resto_pob))
 
@@ -225,14 +225,25 @@ def generar_organismos():
 def get_best():
     if not poblacion:
         return []
-    evaluar_poblacion()
-    mejores = [vars(e) for e in poblacion if e.adaptabilidad >= 0.85]
+    mejores = [
+        vars(e) for e in poblacion
+        if e.adaptabilidad is not None and e.adaptabilidad >= 0.85
+    ]
     return mejores
 
 @app.get('/get-evolution')
 def get_evolution():
-    #print(mejores_por_generacion)
-    return [vars(e) for e in mejores_por_generacion]
+    return [
+        {
+            "generacion": i,
+            "a": e.a,
+            "b": e.b,
+            "c": e.c,
+            "bin": e.bin,
+            "adaptabilidad": e.adaptabilidad
+        }
+        for i, e in enumerate(mejores_por_generacion)
+    ]
 
 @app.get('/promedio-error')
 def get_promedio():
