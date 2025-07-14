@@ -1,6 +1,6 @@
 # 🧬 Algoritmo Genético con FastAPI + React
 
-Este proyecto implementa un algoritmo genético para ajustar una función cuadrática `ax² + bx + c` a un conjunto de puntos generados desde una función original fija.
+Este proyecto implementa un algoritmo genético para ajustar una función a un conjunto de puntos generados desde una función original fija.
 
 ### 1. Clonar el repositorio
 
@@ -11,7 +11,7 @@ git clone https://github.com/JoseAngelVirgenEslava2/AGweb.git
 ### 2. Instalar FastAPI, Uvicorn y Pydantic (se recomienda usar un entorno virtual)
 
 ```bash
-pip install fastapi uvicorn pydantic
+pip install fastapi uvicorn pydantic numpy
 ```
 
 ### 3. Ejecutar el servidor
@@ -31,6 +31,7 @@ cd pagina
 ```bash
 npm install
 npm install recharts
+npm install @types/three --save-dev
 ```
 
 ### 6. Ejecutar la aplicacion
