@@ -49,9 +49,8 @@
             let finalMinZ = -10, finalMaxZ = 10;
             let finalZScale = 1;
             let centerX = 0, centerY = 0, centerZ = 0;
-            let cameraDistance = 20; // Default reasonable distance
+            let cameraDistance = 20;
 
-            // Fetch data from FastAPI backend
             try {
                 const response = await fetch('http://localhost:8000/get-mesh-points');
                 if (!response.ok) {
@@ -66,7 +65,6 @@
                     originalMeshRaw.y && originalMeshRaw.y.length > 0 &&
                     originalMeshRaw.z && originalMeshRaw.z.length > 0) {
 
-                    // Transform the fetched 1D x,y and 2D z arrays into the 3D [x,y,z] point structure
                     const originalMesh = originalMeshRaw.z.map((row, i) =>
                         row.map((z, j) => [originalMeshRaw.x[j], originalMeshRaw.y[i], z])
                     );
@@ -83,7 +81,6 @@
                     console.log('✅ Original mesh shape (rows, cols):', numRows, numCols);
                     console.log('Example flattened original point (first 3 values):', flatOriginal.slice(0, 3));
 
-                    // --- Dynamic Range and Camera Calculation ---
                     const allPoints = [...flatOriginal, ...flatOrganism];
 
                     const xValues = allPoints.filter((_, i) => i % 3 === 0);
@@ -97,7 +94,6 @@
                     const minZ = zValues.length > 0 ? Math.min(...zValues) : -10;
                     const maxZ = zValues.length > 0 ? Math.max(...zValues) : 10;
 
-                    // Add a small buffer to all ranges
                     const xRangeBuffer = (maxX - minX) * 0.1;
                     const yRangeBuffer = (maxY - minY) * 0.1;
                     const zRangeBuffer = (maxZ - minZ) * 0.1;
@@ -109,7 +105,6 @@
                     finalMinZ = minZ - zRangeBuffer;
                     finalMaxZ = maxZ + zRangeBuffer;
 
-                    // Ensure ranges are valid (e.g., if min=max, expand slightly)
                     if (finalMinX === finalMaxX) { finalMinX -= 1; finalMaxX += 1; }
                     if (finalMinY === finalMaxY) { finalMinY -= 1; finalMaxY += 1; }
                     if (finalMinZ === finalMaxZ) { finalMinZ -= 1; finalMaxZ += 1; }
@@ -119,22 +114,20 @@
                     console.log('Calculated Y Range:', finalMinY, finalMaxY);
                     console.log('Calculated Z Range:', finalMinZ, finalMaxZ);
 
-                    // Determine appropriate scale for Z-axis to make it visually comparable to X/Y
                     const xExtent = finalMaxX - finalMinX;
                     const yExtent = finalMaxY - finalMinY;
                     const zExtent = finalMaxZ - finalMinZ;
 
                     const maxXYExtent = Math.max(xExtent, yExtent);
                     finalZScale = zExtent > 0 ? Math.min(1, maxXYExtent / zExtent) : 1;
-                    finalZScale = Math.max(finalZScale, 0.01); // Don't go below 0.01
+                    finalZScale = Math.max(finalZScale, 0.01);
 
-                    // Calculate initial camera position to look at the center of the data
                     centerX = (finalMinX + finalMaxX) / 2;
                     centerY = (finalMinY + finalMaxY) / 2;
-                    centerZ = (finalMinZ + finalZScale) / 2; // Adjusted for scaled Z
+                    centerZ = (finalMinZ + finalZScale) / 2;
 
-                    cameraDistance = Math.max(xExtent, yExtent, (zExtent / finalZScale) * 0.5) * 1.5; // Adjusted camera distance
-                    cameraDistance = Math.max(cameraDistance, 20); // Ensure a minimum distance
+                    cameraDistance = Math.max(xExtent, yExtent, (zExtent / finalZScale) * 0.5) * 1.5;
+                    cameraDistance = Math.max(cameraDistance, 20);
 
                     console.log('Calculated Z Scale Factor:', finalZScale);
                     console.log('Calculated Camera Position:', centerX, centerY, centerZ + cameraDistance);
@@ -142,39 +135,34 @@
                 } else {
                     console.warn('Datos de malla no válidos o vacíos del servidor.');
                     if (loadingMessage) loadingMessage.textContent = 'No hay datos de malla para mostrar. Asegúrate de ejecutar el algoritmo genético primero.';
-                    // Use default ranges and camera position for the test surface
                     finalMinX = -10; finalMaxX = 10;
                     finalMinY = -10; finalMaxY = 10;
-                    finalMinZ = -5; finalMaxZ = 5; // A more visible range for test
+                    finalMinZ = -5; finalMaxZ = 5;
                     finalZScale = 1;
                     centerX = 0; centerY = 0; centerZ = 0;
-                    cameraDistance = 30; // Closer default for test
+                    cameraDistance = 30;
                 }
 
             } catch (error) {
                 console.error('Error al cargar datos del servidor:', error);
                 if (loadingMessage) loadingMessage.textContent = `Error: ${error.message}. ¿Está el servidor FastAPI funcionando en http://localhost:8000?`;
-                // Use default ranges and camera position for the test surface if fetch fails
                 finalMinX = -10; finalMaxX = 10;
                 finalMinY = -10; finalMaxY = 10;
-                finalMinZ = -5; finalMaxZ = 5; // A more visible range for test
+                finalMinZ = -5; finalMaxZ = 5;
                 finalZScale = 1;
                 centerX = 0; centerY = 0; centerZ = 0;
-                cameraDistance = 30; // Closer default for test
+                cameraDistance = 30;
             }
 
             // --- Initialize MathBox ---
-            if (loadingMessage) loadingMessage.remove(); // Remove loading message
+            if (loadingMessage) loadingMessage.remove();
 
-            // Inicialización de MathBox 2 (sin .start())
             var mathbox = MathBox.mathBox({
                 plugins: ['core', 'controls', 'cursor'],
                 controls: { klass: THREE.OrbitControls },
                 element: container,
-                // stats: true,
             });
 
-            // *** Verificación de inicialización de MathBox ***
             if (!mathbox) {
                 console.error('ERROR: MathBox no se pudo inicializar. Puede que WebGL no esté soportado o haya un problema con la librería.');
                 if (loadingMessage) {
@@ -186,21 +174,15 @@
             // Configuración de la cámara
             mathbox.camera({
                 proxy: true,
-                position: [2, 3, 2], // Ejemplo de una posición de cámara 3D (X, Y, Z)
-                rotation: [-0.5, 0.5, 0], // Ejemplo de rotación inicial (Pitch, Yaw, Roll en radianes)
+                position: [2, 3, 2],
+                rotation: [-0.5, 0.5, 0],
             });
             
-            // La siguiente línea (if (mathbox.fallback)) ya no es necesaria con esta versión.
-            // if (mathbox.fallback) {
-            //     console.error('WebGL no soportado. El navegador puede no ser compatible.');
-            //     return;
-            // }
 
 
             const view = mathbox.cartesian({
                 range: [[finalMinX, finalMaxX], [finalMinY, finalMaxY], [finalMinZ, finalMaxZ]],
-                scale: [1, 1, finalZScale], // Apply calculated Z-scale
-                // position: [centerX, centerY, centerZ + cameraDistance], // ¡ESTA LÍNEA DEBE SEGUIR COMENTADA O ELIMINADA!
+                scale: [1, 1, finalZScale],
             });
 
             // Add Axes
@@ -218,8 +200,6 @@
                 opacity: 0.2,
             });
 
-            // --- TEST SURFACE (GREEN) ---
-            // A simple known function: z = sin(x) + cos(y)
             const testNumRows = 50;
             const testNumCols = 50;
             const testFlatData = [];
@@ -240,7 +220,7 @@
                 width: testNumCols,
                 data: testFlatData,
             }).surface({
-                color: 0x00ff00, // Green
+                color: 0x00ff00,
                 shaded: true,
                 lineX: true,
                 lineY: true,
@@ -248,7 +228,6 @@
             });
 
 
-            // --- YOUR FETCHED SURFACES (RED and BLUE) ---
             if (flatOriginal.length > 0 && flatOrganism.length > 0) {
                 // Original Surface (Red)
                 view.array({
@@ -283,7 +262,6 @@
                 console.warn("No se renderizaron las mallas original/organismo porque los datos están vacíos.");
             }
 
-            // Cleanup function
             return () => {
                 while (container && container.firstChild) {
                     container.removeChild(container.firstChild);
