@@ -10,6 +10,5 @@ class Parametros(BaseModel):
     criterio: str
     generaciones: int | None = None
     tipo_algoritmo: str
-    tipo_funcion: str
     error: float | None = None
     

@@ -4,11 +4,12 @@ import ast
 from modelos.Parametros import Parametros
 from modelos.Clase import Elemento
 from fastapi.middleware.cors import CORSMiddleware
+import numpy as np
 
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -22,7 +23,6 @@ error_por_generacion = []
 numero_generaciones = 0
 tipo_algoritmo = None
 error_aceptacion = 0.0
-tipo_funcion = None
 
 # Datos globales
 funcion_original = {'a': 1, 'b': 1, 'c': 0, 'd': 0, 'e': 0, 'f': 0}
@@ -66,53 +66,31 @@ def decodificar(binario, rango):
     delta = (maximo - minimo) / (two_n - 1)
     return round(minimo + indice * delta, 6)
 
-#def generar_puntos_funcion_original(n=20, rango_x=(-10, 10), rango_y=(-10, 10)):
-#    global puntos_x, puntos_y, puntos_z
-#    puntos_x = [round(random.uniform(rango_x[0], rango_x[1]), 4) for _ in range(n)]
-#    puntos_y = [round(random.uniform(rango_y[0], rango_y[1]), 4) for _ in range(n)]
-#    a_orig, b_orig, c_orig, d_orig, e_orig, f_orig = (
-#        funcion_original['a'], funcion_original['b'], funcion_original['c'],
-#        funcion_original['d'], funcion_original['e'], funcion_original['f']
-#    )
-#    puntos_z = [
-#        a_orig * x**2 + b_orig * y**2 + c_orig * x * y + d_orig * x + e_orig * y + f_orig
-#        for x, y in zip(puntos_x, puntos_y)
-#    ]
-    
-def generar_puntos_funcion_3d_original(num_points=20, x_range=(-10, 10), y_range=(-10, 10)):
+def generar_malla_puntos(x_range=(-10, 10), y_range=(-10, 10), pasos=50):
     global puntos_x, puntos_y, puntos_z_original
     puntos_x.clear()
     puntos_y.clear()
     puntos_z_original.clear()
 
-    a, b, c = funcion_original['a'], funcion_original['b'], funcion_original['c']
-    d, e, f = funcion_original['d'], funcion_original['e'], funcion_original['f']
+    a, b, c, d, e, f = (
+        funcion_original["a"], funcion_original["b"], funcion_original["c"],
+        funcion_original["d"], funcion_original["e"], funcion_original["f"]
+    )
 
-    for _ in range(num_points):
-        x = round(random.uniform(x_range[0], x_range[1]), 4)
-        y = round(random.uniform(y_range[0], y_range[1]), 4)
+    x_vals = np.linspace(x_range[0], x_range[1], pasos)
+    y_vals = np.linspace(y_range[0], y_range[1], pasos)
 
-        if tipo_funcion == "paraboloide":
-            z = a * x**2 + b * y**2 + f
-        elif tipo_funcion == "elipsoide":
-            z = a * x**2 + b * y**2 + c * x * y + f
-        else:
-            z = a * x**2 + b * y**2 + c * x * y + d * x + e * y + f
-
-        puntos_x.append(x)
-        puntos_y.append(y)
-        puntos_z_original.append(z)
+    for y in y_vals:
+        for x in x_vals:
+            z = a*x**2 + b*y**2 + c*x*y + d*x + e*y + f
+            puntos_x.append(x)
+            puntos_y.append(y)
+            puntos_z_original.append(z)
 
 def calcular_error(a, b, c, d, e, f):
     errores = []
     for x, y, z_real in zip(puntos_x, puntos_y, puntos_z_original):
-        if tipo_funcion == "paraboloide":
-            z_pred = a * x**2 + b * y**2 + f
-        elif tipo_funcion == "elipsoide":
-            z_pred = a * x**2 + b * y**2 + c * x * y + f
-        else:
-            z_pred = a * x**2 + b * y**2 + c * x * y + d * x + e * y + f
-
+        z_pred = a * x**2 + b * y**2 + c * x * y + d * x + e * y + f
         errores.append(abs(z_pred - z_real))
 
     return sum(errores) / len(errores)
@@ -311,13 +289,13 @@ def evolucionar(generaciones=50, umbral=0.01):
 
 @app.post('/add-values')
 def agregar(params: Parametros):
-    global numero_generaciones, tipo_algoritmo, error_aceptacion, tipo_funcion
+    print(params)
+    global numero_generaciones, tipo_algoritmo, error_aceptacion
     rangos['a'], rangos['b'], rangos['c'] = ast.literal_eval(params.rangoa), ast.literal_eval(params.rangob), ast.literal_eval(params.rangoc)
     rangos['d'], rangos['e'], rangos['f'] = ast.literal_eval(params.rangod), ast.literal_eval(params.rangoe), ast.literal_eval(params.rangof)
     numero_generaciones = params.generaciones or 50
     tipo_algoritmo = params.tipo_algoritmo or "ruleta"
     error_aceptacion = params.error or 0.01
-    tipo_funcion = params.tipo_funcion or "general"
     mapas['a'], _ = mapear(rangos['a'])
     mapas['b'], _ = mapear(rangos['b'])
     mapas['c'], _ = mapear(rangos['c'])
@@ -325,7 +303,7 @@ def agregar(params: Parametros):
     mapas['e'], _ = mapear(rangos['e'])
     mapas['f'], _ = mapear(rangos['f'])
 
-    generar_puntos_funcion_3d_original()
+    generar_malla_puntos()
     criterio_paro["tipo"] = params.criterio
     return {'message': 'Función original y rangos definidos'}
 
@@ -376,9 +354,51 @@ def get_promedio():
 @app.get('/get-original-points')
 def get_original_points():
     if not puntos_x or not puntos_y or not puntos_z_original:
-        generar_puntos_funcion_3d_original()
+        generar_malla_puntos()
     return {
         "x": puntos_x or [],
         "y": puntos_y or [],
         "z": puntos_z_original or []
+    }
+    
+@app.get("/get-mesh-points")
+def get_mesh_points():
+    if not mejores_por_generacion:
+        return {
+            "original": {"x": [], "y": [], "z": []},
+            "organism": {"x": [], "y": [], "z": []}
+        }
+
+    best = mejores_por_generacion[-1]
+
+    size = int(len(puntos_x) ** 0.5)
+    x_vals = puntos_x[:]
+    y_vals = puntos_y[:]
+    z_original = puntos_z_original[:]
+
+    X = np.array(x_vals).reshape((size, size))
+    Y = np.array(y_vals).reshape((size, size))
+    Z_orig = np.array(z_original).reshape((size, size))
+    Z_org = np.zeros_like(Z_orig)
+
+    for i in range(size):
+        for j in range(size):
+            x = X[i, j]
+            y = Y[i, j]
+            Z_org[i, j] = (
+                best.a * x ** 2 + best.b * y ** 2 + best.c * x * y +
+                best.d * x + best.e * y + best.f
+            )
+
+    return {
+        "original": {
+            "x": X[0].tolist(),
+            "y": [row[0] for row in Y],
+            "z": Z_orig.tolist()
+        },
+        "organism": {
+            "x": X[0].tolist(),
+            "y": [row[0] for row in Y],
+            "z": Z_org.tolist()
+        }
     }
