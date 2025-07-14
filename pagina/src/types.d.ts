@@ -1,5 +1,4 @@
 declare namespace THREE {
-    // Asegurarse de que OrbitControls esté disponible en el namespace THREE
     export class OrbitControls {
       constructor(object: THREE.Camera, domElement?: HTMLElement);
       target: THREE.Vector3;
